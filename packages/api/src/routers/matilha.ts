@@ -17,6 +17,7 @@ import {
 	PAGE_SIZE,
 } from "../lib/constants";
 import { fetchOgImage } from "../lib/og-image";
+import { paginate } from "../lib/pagination";
 import { normalizePhone } from "../lib/phone";
 import {
 	computeCurrentStreak,
@@ -25,13 +26,6 @@ import {
 	EDIT_WINDOW_MS,
 } from "../lib/streak";
 import { notifyCheckIn } from "../lib/whatsapp";
-
-function paginate<T>(items: T[], cursor: number) {
-	return {
-		items,
-		nextCursor: items.length === PAGE_SIZE ? cursor + PAGE_SIZE : undefined,
-	};
-}
 
 function hasProductWithStatus(
 	founderUserId: typeof founder.userId,
@@ -164,7 +158,7 @@ export const matilhaRouter = {
 		create: protectedProcedure
 			.input(
 				z.object({
-					blocked: z.string().min(1),
+					blocked: z.string(),
 					help: z.string().optional(),
 					productId: z.string().optional(),
 					progress: z.string().min(1),
@@ -340,20 +334,23 @@ export const matilhaRouter = {
 		update: protectedProcedure
 			.input(
 				z.object({
-					blocked: z.string().min(1),
+					blocked: z.string(),
 					help: z.string().optional(),
 					id: z.string(),
+					productId: z.string().min(1),
 					progress: z.string().min(1),
 				})
 			)
 			.handler(async ({ input, context }) => {
 				const founderId = context.session.user.id;
 				await requireEditableCheckIn(input.id, founderId);
+				await requireOwnedProduct(input.productId, founderId);
 				await db
 					.update(checkIn)
 					.set({
 						blocked: input.blocked,
 						help: input.help ?? null,
+						productId: input.productId,
 						progress: input.progress,
 					})
 					.where(eq(checkIn.id, input.id));
